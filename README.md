@@ -10,7 +10,7 @@ Copyright (C) 2019 Nathan Fraser
 
 ## Installation
 
-	$ pip3 install asfv1
+	$ python3 ./setup.py install
 
 ## Description
 
