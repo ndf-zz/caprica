@@ -1,6 +1,6 @@
 # caprica
 
-Lightweight Galactica/DHI replacement
+Galactica/DHI replacement
 
 Copyright (C) 2019 Nathan Fraser
 

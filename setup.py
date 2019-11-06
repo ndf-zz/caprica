@@ -9,7 +9,7 @@ setuptools.setup(
     version="1.0.0",
     author="Nathan Fraser",
     author_email="ndf@metarace.com.au",
-    description="Lightweight Galactica/DHI replacement",
+    description="Galactica/DHI replacement",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ndf-zz/caprica",
