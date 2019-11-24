@@ -1,10 +1,12 @@
-import setuptools
+from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     python_requires='>=3.0',
+    use_scm_version=True,
+    setup_requires=['setuptools_scm'],
     name="caprica",
     version="1.0.0",
     author="Nathan Fraser",
@@ -26,5 +28,6 @@ setuptools.setup(
         'Topic :: Utilities',
     ],
     py_modules=['caprica',],
+    include_package_data=True,
 )
 
