@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setuptools.setup(
+setup(
     python_requires='>=3.0',
     use_scm_version=True,
     setup_requires=['setuptools_scm'],
