@@ -69,6 +69,8 @@ class unt4(object):
     GS = 0x1d
     RS = 0x1e
     US = 0x1f
+    tmap = str.maketrans({SOH:0x20,STX:0x20,DLE:0x20,EOT:0x20,
+                          DC2:0x20,DC3:0x20,DC4:0x20,ERP:0x20,ERL:0x20})
 
     """UNT4 Packet Class."""
     def __init__(self, unt4str=None, 
@@ -95,7 +97,7 @@ class unt4(object):
         self.erl = erl          # true for <ERL>
         self.xx = xx            # input column 0-99
         self.yy = yy            # input row 0-99
-        self.text = text        # text string
+        self.text = text.translate(tmap)
         if unt4str is not None:
             self.unpack(unt4str)
 
@@ -354,7 +356,7 @@ class tableau(threading.Thread):
         try:
             self.__fb.sendto(self.__cks.get_data(), self.__fba)
         except Exception as e:
-            print('Error sending clock: ' + repr(e))
+            print('caprica: Error sending clock: ' + repr(e))
 
     def __render_char(self, c):
         """Use manual then fallback font to render a missing glyph."""
@@ -364,9 +366,9 @@ class tableau(threading.Thread):
             try:
                 self.__glcache[c] = cairo.ImageSurface.create_from_png(
                                       resource_filename(__name__, sfile))
-                print('Loaded glyph \'{}\'from {}'.format(c, sfile))
+                print('caprica: Loaded glyph \'{}\'from {}'.format(c, sfile))
             except Exception as s:
-                print('Error reading glyph {} from {}: {}'.format(
+                print('caprica: Error reading glyph {} from {}: {}'.format(
                         c, sfile, repr(e)))
         if c not in self.__glcache:
             # use a sloppy rendering of the unifont glyph
@@ -397,6 +399,12 @@ class tableau(threading.Thread):
            
         self.__txc.restore()
 
+    def __erase_page(self):
+        self.__txc.save()
+        self.__txc.set_source_rgba(0,0,0,0)
+        self.__txc.paint()
+        self.__txc.restore()
+
     def __show_text(self, msg=None):
         """Update text frame and send to display."""
         ret = False
@@ -405,13 +413,15 @@ class tableau(threading.Thread):
             if msg.erp or msg.header == '0040100096':
                 # General clearing
                 ret = True
-                self.__txc.save()
-                self.__txc.set_source_rgba(0,0,0,0)
-                self.__txc.paint() 
-                self.__txc.restore()
                 dirty = True
+                self.__erase_page()
             elif msg.yy is not None:
                 # Positioned text
+
+                # If re-displaying from the clock, blank whole page
+                if self.__lu > TIMEOUT:
+                    self.__erase_page()
+
                 ret = True
                 vo = LINEH * msg.yy
                 if msg.yy > 1:
@@ -446,7 +456,7 @@ class tableau(threading.Thread):
                 try:
                     self.__fb.sendto(self.__txs.get_data(), self.__fba)
                 except Exception as e:
-                    print('Error sending text: ' + repr(e))
+                    print('caprica: Error sending text: ' + repr(e))
         return ret
         
     def run(self):
@@ -467,7 +477,7 @@ class tableau(threading.Thread):
             except queue.Empty:
                 pass
             except Exception as e:
-                print(repr(e))
+                print('caprica: Tableau exception: ' + repr(e))
                 running = False
 
 def main():
