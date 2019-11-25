@@ -97,7 +97,7 @@ class unt4(object):
         self.erl = erl          # true for <ERL>
         self.xx = xx            # input column 0-99
         self.yy = yy            # input row 0-99
-        self.text = text.translate(tmap)
+        self.text = text.translate(self.tmap)
         if unt4str is not None:
             self.unpack(unt4str)
 
@@ -427,9 +427,9 @@ class tableau(threading.Thread):
                 if msg.yy > 1:
                     vo += HDRGAP
                 ho = msg.xx * GLW
+                if msg.yy > 1:	# all non-headers are upper-cased
+                    msg.text = msg.text.upper() # THIS MAY NOT BE THE SAME LEN
                 for c in msg.text:
-                    if msg.yy > 1:	# all non-headers are upper-cased
-                        c = c.upper()
                     self.__place_char(c, ho, vo)
                     ho += GLW
                     dirty = True
