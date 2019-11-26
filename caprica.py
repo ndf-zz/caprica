@@ -308,7 +308,7 @@ class tableau(threading.Thread):
                     self.__d[var] = None
         elif amsgno == 10:
             if self.__d['DC'] is not None:
-                self.__clock_text('{0:0.1f} \xe2'.format(
+                self.__clock_text('{0:0.1f} \u00b0C'.format(
                               self.__d['DC']),oft[0],oft[1])
         elif amsgno == 20:
             if self.__d['RH'] is not None:

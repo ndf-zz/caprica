@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup,
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -9,7 +9,6 @@ setup(
     setup_requires=['setuptools_scm'],
     name="caprica",
     version="1.0.0",
-    packages=find_packages(),
     author="Nathan Fraser",
     author_email="ndf@metarace.com.au",
     description="Galactica/DHI replacement",
