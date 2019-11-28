@@ -32,8 +32,8 @@ GLMAX = 0x80			# highest index in glyph file
 FBFONT = 'unifont'		# fallback for undefined glyphs
 TIMEOUT = 30			# revert to clock after timeout seconds
 CKH = 71			# height of clock
-CKFONT = 'TeX Gyre Adventor'	# font style for clock info text
-CKFH = 12.0			# height of clock info text
+CKFONT = 'NotoSans'		# font style for clock info text
+CKFH = 13.0			# height of clock info text
 DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 # Image resource files
@@ -195,8 +195,9 @@ class tableau(threading.Thread):
         self.__fb = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         fba = fba.strip().lstrip('\0@')
         self.__fba = ('\0'+fba).encode('ascii','ignore')
-        self.__q = queue.Queue(maxsize=4)
+        self.__q = queue.Queue(maxsize=32)
         self.__lu = TIMEOUT+1
+        self.__lt = True
         self.__w = x
         self.__h = y
         self.__d = {'DC':None, 'RH':None, 'BP':None}
@@ -207,8 +208,7 @@ class tableau(threading.Thread):
         self.__ckc.set_operator(cairo.Operator.SOURCE)
         self.__ckc.set_line_width(0.75)
         self.__ckrot = math.pi/30.0
-        self.__ckc.select_font_face(CKFONT, cairo.FontSlant.OBLIQUE,
-                                            cairo.FontWeight.NORMAL)
+        self.__ckc.select_font_face(CKFONT)
         self.__ckc.set_font_size(CKFH)
         self.__ckf = cairo.ImageSurface.create_from_png(CKFACE)
         self.__ckop = cairo.ImageSurface.create_from_png(CKOPEN)
@@ -224,6 +224,7 @@ class tableau(threading.Thread):
         try:
             self.__q.put_nowait(msg)
         except queue.Full:
+            print('Message queue is full')
             return None
 
     def __clock_hand(self, a, l, w):
@@ -261,33 +262,37 @@ class tableau(threading.Thread):
         self.__ckc.paint()
         self.__ckc.restore()
 
-    def __clock_text(self, c, x, y):
-        """Draw string 'c' on clock at [x,y]."""
+    def __clock_text(self, c):
+        """Draw string 'c' on clock info area"""
         self.__ckc.save()
         trefy = 41
-        trefx = CKH+9
+        trefx = CKH+2
+        tbw = self.__w-trefx
+        tbh = 16	# really?
         self.__ckc.set_source_rgba(0,0,0,0)
-        self.__ckc.rectangle(trefx,trefy-12,58,16)
+        self.__ckc.rectangle(trefx,trefy-12,tbw, tbh)
         self.__ckc.fill_preserve()
         self.__ckc.clip()
         self.__ckc.set_source_rgba(0,0,0,1)
         fm = self.__ckc.text_extents(c)
-        xo = trefx+x + 0.5*55 - 0.5*fm.width
-        self.__ckc.move_to(xo,trefy+y)
+        xo = trefx + 0.5*tbw - 0.5*fm.width
+        self.__ckc.move_to(xo,trefy)
         self.__ckc.show_text(c)
         self.__ckc.restore()
 
     def __show_clock(self):
         """Re-draw clock and output to display."""
-        ctr = [[0,0], [1,0], [2,0], [3,0],
-               [3,1], [2,1], [1,1], [0,1]]
+        ctr = [[0,0], [1,0], [2,0],
+               [2,1], [1,1], [0,1]]
         nc = time.localtime()
-        oft = ctr[nc.tm_yday % 8]	# 'screen saver'
+        oft = ctr[nc.tm_yday % len(ctr)]	# 'screen saver'
 
         # Place background then add hands.
         self.__ckc.save()
-        self.__ckc.rectangle(0, 0, CKH+2, CKH+1)
-        self.__ckc.clip()
+        if not self.__lt:
+            # clock was last frame output
+            self.__ckc.rectangle(0, 0, CKH+2, CKH+1)
+            self.__ckc.clip()
         self.__ckc.set_source_surface(self.__ckf, oft[0], oft[1])
         self.__ckc.paint()
         self.__ckc.restore()
@@ -302,32 +307,31 @@ class tableau(threading.Thread):
         amsgno = (nc.tm_sec) % 60
         if amsgno in [40,0]:
             self.__clock_text('{} {}/{}'.format(
-                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon),oft[0],oft[1])
+                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon))
             if amsgno == 40:
                 for var in self.__d:	# clear out stale info
                     self.__d[var] = None
         elif amsgno == 10:
             if self.__d['DC'] is not None:
-                self.__clock_text('{0:0.1f} {1}'.format(
-                              self.__d['DC'],chr(0x2103)),oft[0],oft[1])
+                self.__clock_text('{0:0.1f} {1}C'.format(
+                              self.__d['DC'],chr(0xb0)))
         elif amsgno == 20:
             if self.__d['RH'] is not None:
                 self.__clock_text('{0:0.0f} %rh'.format(
-                              self.__d['RH']),oft[0],oft[1])
+                              self.__d['RH']))
             else:
                 self.__clock_text('{} {}/{}'.format(
-                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon),oft[0],oft[1])
+                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon))
         elif amsgno == 30:
             if self.__d['BP'] is not None:
-                self.__clock_text('{0:0.0f} hPa'.format(
-                              self.__d['BP']),oft[0],oft[1])
+                self.__clock_text('{0:0.0f} hPa'.format(self.__d['BP']))
             else:
                 self.__clock_text('{} {}/{}'.format(
-                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon),oft[0],oft[1])
+                    DAYS[nc.tm_wday], nc.tm_mday, nc.tm_mon))
 
         # Add top of minute animation
-        xo = CKH+9+oft[0]
-        yo = 52+oft[1]
+        xo = CKH+2+8	# check position
+        yo = 52
         if nc.tm_sec < 4 or nc.tm_sec > 49:
             if nc.tm_sec in [50,0]:	# 10/GO
                 i = 0
@@ -347,7 +351,7 @@ class tableau(threading.Thread):
         else:
             self.__ckc.save()
             self.__ckc.set_source_rgba(0,0,0,0)
-            self.__ckc.rectangle(xo,yo,58,12)
+            self.__ckc.rectangle(xo,yo,self.__w-xo,12)
             self.__ckc.fill()
             self.__ckc.restore()
 
@@ -355,6 +359,7 @@ class tableau(threading.Thread):
         self.__cks.flush()
         try:
             self.__fb.sendto(self.__cks.get_data(), self.__fba)
+            self.__lt = False
         except Exception as e:
             print('caprica: Error sending clock: ' + repr(e))
 
@@ -410,7 +415,7 @@ class tableau(threading.Thread):
         ret = False
         if isinstance(msg, unt4):
             dirty = False
-            if msg.erp or msg.header == '0040100096':
+            if msg.erp:
                 # General clearing
                 ret = True
                 dirty = True
@@ -435,9 +440,9 @@ class tableau(threading.Thread):
                     dirty = True
                 if msg.erl:
                     self.__txc.save()
-                    self.__txc.set_source_rgba(0,0,0,0)
                     self.__txc.rectangle(ho,vo,self.__w-ho,GLH)
                     self.__txc.clip()
+                    self.__txc.set_source_rgba(0,0,0,0)
                     self.__txc.paint() 
                     self.__txc.restore()
                     dirty = True
@@ -455,6 +460,7 @@ class tableau(threading.Thread):
                 self.__txs.flush()
                 try:
                     self.__fb.sendto(self.__txs.get_data(), self.__fba)
+                    self.__lt = True
                 except Exception as e:
                     print('caprica: Error sending text: ' + repr(e))
         return ret
