@@ -1,14 +1,14 @@
-from setuptools import setup,
+import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setup(
+setuptools.setup(
     python_requires='>=3.0',
+    setup_requires=['setuptools_scm',],
     use_scm_version=True,
-    setup_requires=['setuptools_scm'],
+    zip_safe=True,
     name="caprica",
-    version="1.0.0",
     author="Nathan Fraser",
     author_email="ndf@metarace.com.au",
     description="Galactica/DHI replacement",
@@ -21,13 +21,18 @@ setup(
         ],
     },
     classifiers=[
-        'Development Status :: 1 - Planning',
+        'Development Status :: 4 - Beta',
 	'Environment :: Console',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Topic :: Utilities',
     ],
     py_modules=['caprica',],
-    include_package_data=True,
+    data_files=[('data',[
+                 'data/clockface-71.png',
+                 'data/clockpip-close.png',
+                 'data/clockpip-open.png',
+                 'data/ISO-8859-1.png',
+                 'data/unichr-0x00444.png',
+               ]),],
 )
-
