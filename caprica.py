@@ -19,7 +19,7 @@ from pkg_resources import resource_filename, resource_exists
 # Configuration
 VERSION = '1.0.0'
 DEFPORT = 2004 - 58		# DHI port "58 years before the fall"
-DEFFB = '@caprica:0'		# display socket address
+DEFFB = '@caprica-144x72'	# display socket address
 WIDTH = 144			# display width
 HEIGHT = 72			# display height
 LINEH = 10			# pixel height of all text lines
@@ -28,7 +28,8 @@ HDRGAP = 4			# margin between header and result lines
 # Program constants
 GLW = 6				# glyph width
 GLH = 8				# glyph height
-GLMAX = 0x80			# highest index in glyph file
+GLPW = 32			# number of glyphs per row in source map
+GLSZ = 0x100			# number of glyphs in source map
 FBFONT = 'unifont'		# fallback for undefined glyphs
 TIMEOUT = 30			# revert to clock after timeout seconds
 CKH = 71			# height of clock
@@ -37,7 +38,7 @@ CKFH = 13.0			# height of clock info text
 DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 # Image resource files
-GLSRC = resource_filename(__name__, 'data/6x8-ascii.png')
+GLSRC = resource_filename(__name__, 'data/ISO-8859-1.png')
 CKOPEN = resource_filename(__name__, 'data/clockpip-open.png')
 CKCLOSE = resource_filename(__name__, 'data/clockpip-close.png')
 CKOPEN = resource_filename(__name__, 'data/clockpip-open.png')
@@ -216,9 +217,16 @@ class tableau(threading.Thread):
         self.__txs = cairo.ImageSurface(cairo.FORMAT_A1, self.__w, self.__h)
         self.__txc = cairo.Context(self.__txs)
         self.__txc.set_operator(cairo.Operator.SOURCE)
-        self.__gls = cairo.ImageSurface.create_from_png(GLSRC)
-        self.__glcache = {}
-    
+        self.__fbglcache = {}
+        self.__gls = cairo.ImageSurface(cairo.FORMAT_A1,
+                                        GLH*GLPW, GLH*(GLSZ//GLPW))
+        # read in font png and render to A1 glyph cache
+        tmpc = cairo.Context(self.__gls)
+        tmps = cairo.ImageSurface.create_from_png(GLSRC)
+        tmpc.set_source_surface(tmps,0,0)
+        tmpc.paint()
+        self.__gls.flush()
+
     def update(self, msg=None):
         """Queue a tableau update."""
         try:
@@ -369,22 +377,22 @@ class tableau(threading.Thread):
         if resource_exists(__name__, sfile):
             # use a custom bitmap
             try:
-                self.__glcache[c] = cairo.ImageSurface.create_from_png(
+                self.__fbglcache[c] = cairo.ImageSurface.create_from_png(
                                       resource_filename(__name__, sfile))
                 print('caprica: Loaded glyph \'{}\'from {}'.format(c, sfile))
             except Exception as s:
                 print('caprica: Error reading glyph {} from {}: {}'.format(
                         c, sfile, repr(e)))
-        if c not in self.__glcache:
+        if c not in self.__fbglcache:
             # use a sloppy rendering of the unifont glyph
-            self.__glcache[c] = cairo.ImageSurface(cairo.FORMAT_A1, 6,8)
-            ctx = cairo.Context(self.__glcache[c])
+            self.__fbglcache[c] = cairo.ImageSurface(cairo.FORMAT_A1, 6,8)
+            ctx = cairo.Context(self.__fbglcache[c])
             ctx.select_font_face(FBFONT)
             fontmat = cairo.Matrix(xx=11.0, yy=10.0)
             ctx.set_font_matrix(fontmat)
             ctx.move_to(-1.0,7.0)
             ctx.show_text(c)
-            self.__glcache[c].flush()
+            self.__fbglcache[c].flush()
 
     def __place_char(self, c, x, y):
         cord = ord(c)
@@ -392,14 +400,15 @@ class tableau(threading.Thread):
         self.__txc.rectangle(x,y,GLW,GLH)
         self.__txc.clip()
 
-        if cord < GLMAX:
-            yo = y-((cord-0x20)*GLH)
-            self.__txc.set_source_surface(self.__gls,x,yo)
+        if cord < GLSZ:
+            yo = y-GLH*(cord//GLPW)
+            xo = x-GLH*(cord%GLPW)
+            self.__txc.set_source_surface(self.__gls, xo, yo)
             self.__txc.paint()
         else:
-            if c not in self.__glcache:
+            if c not in self.__fbglcache:
                 self.__render_char(c)
-            self.__txc.set_source_surface(self.__glcache[c],x,y)
+            self.__txc.set_source_surface(self.__fbglcache[c],x,y)
             self.__txc.paint()
            
         self.__txc.restore()
