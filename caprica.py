@@ -17,7 +17,6 @@ import math
 from pkg_resources import resource_filename, resource_exists
 
 # Configuration
-VERSION = '1.0.0'
 DEFPORT = 2004 - 58		# DHI port "58 years before the fall"
 DEFFB = '@caprica-144x72'	# display socket address
 WIDTH = 144			# display width
@@ -232,7 +231,7 @@ class tableau(threading.Thread):
         try:
             self.__q.put_nowait(msg)
         except queue.Full:
-            print('Message queue is full')
+            print('caprica: Message queue full, discarded message')
             return None
 
     def __clock_hand(self, a, l, w):
@@ -377,12 +376,12 @@ class tableau(threading.Thread):
         if resource_exists(__name__, sfile):
             # use a custom bitmap
             try:
-                self.__fbglcache[c] = cairo.ImageSurface.create_from_png(
-                                      resource_filename(__name__, sfile))
-                print('caprica: Loaded glyph \'{}\'from {}'.format(c, sfile))
+                fname = resource_filename(__name__, sfile)
+                self.__fbglcache[c] = cairo.ImageSurface.create_from_png(fname)
+                print('caprica: Loaded glyph \'{}\'from {}'.format(c, fname))
             except Exception as s:
                 print('caprica: Error reading glyph {} from {}: {}'.format(
-                        c, sfile, repr(e)))
+                        c, fname, repr(e)))
         if c not in self.__fbglcache:
             # use a sloppy rendering of the unifont glyph
             self.__fbglcache[c] = cairo.ImageSurface(cairo.FORMAT_A1, 6,8)
@@ -510,9 +509,6 @@ def main():
     parser.add_argument('-y', '--height',
                         help='Display height in pixels [' + str(HEIGHT) + ']',
                         type=int, default=HEIGHT)
-    parser.add_argument('-v', '--version', help='print version',
-                        action='version',
-                        version='%(prog)s ' + VERSION)
     args = parser.parse_args()
 
     # Create tableau helper thread
