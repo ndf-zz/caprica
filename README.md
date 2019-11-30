@@ -13,7 +13,7 @@ Whole display frames are output to a unix domain socket as a
 cairo FORMAT_A1 buffer of 1 bit pixels packed into 32-bit
 quantities in host-native byte order.
 
-For a hardware interface to the Leurocomm m20 family that runs
+For a compatible hardware interface to the Leurocomm m20 that runs
 on a Beaglebone Black, see the project leuro-m20-bbb.
 
 ## Requirements

@@ -16,9 +16,9 @@ import sys
 import math
 from pkg_resources import resource_filename, resource_exists
 
-# Configuration
+# Display properties
 DEFPORT = 2004 - 58		# DHI port "58 years before the fall"
-DEFFB = '@caprica-144x72'	# display socket address
+DEFFB = '/run/caprica/display'	# display socket address
 WIDTH = 144			# display width
 HEIGHT = 72			# display height
 LINEH = 10			# pixel height of all text lines
@@ -35,6 +35,9 @@ CKH = 71			# height of clock
 CKFONT = 'NotoSans'		# font style for clock info text
 CKFH = 13.0			# height of clock info text
 DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+BUFLEN = 64			# read in chunks no larger than buflen
+MAXBUF = 200			# ignore message that grow larger than maxbuf
+MAXMSG = 32			# allow backlog of up to maxmsg unprocessed in
 
 # Image resource files
 GLSRC = resource_filename(__name__, 'data/ISO-8859-1.png')
@@ -46,51 +49,25 @@ CKFACE = resource_filename(__name__, 'data/clockface-71.png')
 
 # UNT4 message wrapper (based on metarace unt4 lib)
 class unt4(object):
-    # UNT4 mode 1 constants (mostly ascii)
-    NUL = 0x00
-    SOH = 0x01
-    STX = 0x02
-    ETX = 0x03
-    EOT = 0x04
-    ACK = 0x06
-    BEL = 0x07
-    HOME= 0x08
-    CR  = 0x0d
-    LF  = 0x0a
-    ERL = 0x0b
-    ERP = 0x0c
-    DLE = 0x10
-    DC2 = 0x12
-    DC3 = 0x13
-    DC4 = 0x14
-    SYN = 0x16
-    ETB = 0x17
-    FS = 0x1c
-    GS = 0x1d
-    RS = 0x1e
-    US = 0x1f
-    tmap = str.maketrans({SOH:0x20,STX:0x20,DLE:0x20,EOT:0x20,
-                          DC2:0x20,DC3:0x20,DC4:0x20,ERP:0x20,ERL:0x20})
-
+    # UNT4 mode 1 constants
+    SOH = b'\x01'
+    STX = b'\x02'
+    EOT = b'\x04'
+    ERL = b'\x0b'
+    ERP = b'\x0c'
+    DLE = b'\x10'
+    DC2 = b'\x12'
+    DC3 = b'\x13'
+    DC4 = b'\x14'
+    tmap = str.maketrans({SOH[0]:0x20,STX[0]:0x20,
+                          EOT[0]:0x20,ERL[0]:0x20,
+                          ERP[0]:0x20,DLE[0]:0x20,
+                          DC2[0]:0x20,DC3[0]:0x20,DC4[0]:0x20, })
     """UNT4 Packet Class."""
     def __init__(self, unt4str=None, 
                    prefix=None, header='', 
                    erp=False, erl=False, 
                    xx=None, yy=None, text=''):
-        """Constructor.
-
-        Parameters:
-
-          unt4str -- packed unt4 string, overrides other params
-          prefix -- prefix byte <DC2>, <DC3>, etc
-          header -- header string eg 'R_F$'
-          erp -- true for general clearing <ERP>
-          erl -- true for <ERL>
-          xx -- packet's column offset 0-99
-          yy -- packet's row offset 0-99
-          text -- packet content string
-
-        """
         self.prefix = prefix    # <DC2>, <DC3>, etc
         self.header = header    # ident text string eg 'R_F$'
         self.erp = erp          # true for general clearing <ERP>
@@ -103,8 +80,8 @@ class unt4(object):
 
     def unpack(self, unt4str=''):
         """Unpack the UNT4 data into this object."""
-        if len(unt4str) > 2 and unt4str[0] == chr(self.SOH) \
-                            and unt4str[-1] == chr(self.EOT):
+        if len(unt4str) > 2 and ord(unt4str[0]) == self.SOH[0] \
+                            and ord(unt4str[-1]) == self.EOT[0]:
             self.prefix = None
             newhead = u''
             newtext = u''
@@ -118,54 +95,33 @@ class unt4(object):
             packlen = len(unt4str) - 1
             while i < packlen:
                 och = ord(unt4str[i])
-                if och == self.STX:
+                if och == self.STX[0]:
                     stx = True
                     head = False
-                elif och == self.DLE and stx:
+                elif och == self.DLE[0] and stx:
                     dle = True
                 elif dle:
                     dlebuf += unt4str[i]
                     if len(dlebuf) == 4:
                         dle = False
                 elif head:
-                    if och in (self.DC2, self.DC3, self.DC4):
+                    if och in (self.DC2[0], self.DC3[0], self.DC4[0]):
                         self.prefix = och   # assume pfx before head text
                     else:
                         newhead += unt4str[i]
                 elif stx:
-                    if och == self.ERL:
+                    if och == self.ERL[0]:
                         self.erl = True
-                    elif och == self.ERP:
+                    elif och == self.ERP[0]:
                         self.erp = True
                     else:
                         newtext += unt4str[i]
                 i += 1
-            if len(dlebuf) == 4:
+            if len(dlebuf) == 4 and dlebuf.isdigit():
                 self.xx = int(dlebuf[:2])
                 self.yy = int(dlebuf[2:])
             self.header = newhead
             self.text = newtext
-
-    def pack(self):
-        """Return Omega Style UNT4 unicode string packet."""
-        head = ''
-        text = ''
-        if self.erp:	# overrides any other message content
-            text = chr(self.STX) + chr(self.ERP)
-        else:
-            head = self.header
-            if self.prefix is not None:
-                head = chr(self.prefix) + head
-            if self.xx is not None and self.yy is not None:
-                text += chr(self.DLE) + u'{0:02d}{1:02d}'.format(
-                                              self.xx, self.yy)
-            if self.text:
-                text += self.text
-            if self.erl:
-                text += chr(self.ERL)
-            if len(text) > 0:
-                text = chr(self.STX) + text
-        return chr(self.SOH) + head + text + chr(self.EOT)
 
 # TCP/IP message receiver and socket server
 socketserver.TCPServer.allow_reuse_address = True
@@ -173,16 +129,28 @@ socketserver.TCPServer.request_queue_size = 4
 class recvhandler(socketserver.BaseRequestHandler):
     def handle(self):
         """Receive message from TCP"""
-        data = bytearray()
+        data = b''
         while True:
-            data += self.request.recv(64)
-            if len(data) == 0:
+            nd = self.request.recv(BUFLEN)
+            if len(nd) == 0:
                 break
-            while unt4.EOT in data:
-                (buf, sep, data) = data.partition(bytes([unt4.EOT]))
-                m = unt4(unt4str=(buf+sep).decode('utf-8','ignore'))
-                if self.server.tbh is not None and m is not None:
-                    self.server.tbh.update(m)
+            data += nd
+            while unt4.SOH[0] in data:
+                (buf, sep, data) = data.partition(unt4.SOH)
+                data = sep + data
+                if unt4.EOT[0] in data:
+                    (buf, sep, data) = data.partition(unt4.EOT)
+                    mstr = (buf+unt4.EOT).decode('utf-8','ignore')
+                    m = unt4(unt4str=mstr)
+                    if self.server.tbh is not None and m is not None:
+                        self.server.tbh.update(m)
+                else:
+                    break
+
+            # check if there's too much garbage in the stream
+            if len(data) > MAXBUF:
+                data = b''
+
 class receiver(socketserver.ThreadingMixIn, socketserver.TCPServer):
     def set_tableau(self, th=None):
         self.tbh = th
@@ -194,8 +162,8 @@ class tableau(threading.Thread):
         self.running = False
         self.__fb = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         fba = fba.strip().lstrip('\0@')
-        self.__fba = ('\0'+fba).encode('ascii','ignore')
-        self.__q = queue.Queue(maxsize=32)
+        self.__fba = fba
+        self.__q = queue.Queue(maxsize=MAXMSG)
         self.__lu = TIMEOUT+1
         self.__lt = True
         self.__w = x
