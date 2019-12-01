@@ -14,6 +14,7 @@ import cairo
 import os
 import sys
 import math
+import unicodedata
 from pkg_resources import resource_filename, resource_exists
 
 # Display properties
@@ -74,7 +75,7 @@ class unt4(object):
         self.erl = erl          # true for <ERL>
         self.xx = xx            # input column 0-99
         self.yy = yy            # input row 0-99
-        self.text = text.translate(self.tmap)
+        self.text = text.translate(self.tmap) # strip UNT4 controls from text
         if unt4str is not None:
             self.unpack(unt4str)
 
@@ -121,7 +122,7 @@ class unt4(object):
                 self.xx = int(dlebuf[:2])
                 self.yy = int(dlebuf[2:])
             self.header = newhead
-            self.text = newtext
+            self.text = unicodedata.normalize('NFKC', newtext)
 
 # TCP/IP message receiver and socket server
 socketserver.TCPServer.allow_reuse_address = True
@@ -217,6 +218,7 @@ class tableau(threading.Thread):
     def __clock_secs(self, a, l, head=True):
         """Draw a seconds hand of length l from [0,0] rotated to a"""
         self.__ckc.save()
+        self.__ckc.set_operator(cairo.Operator.XOR)
         self.__ckc.rotate(a*self.__ckrot)
         self.__ckc.move_to(0,0)
         self.__ckc.line_to(0,-l)
