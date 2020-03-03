@@ -13,8 +13,8 @@ import socket
 import cairo
 import os
 import sys
-import math
-import unicodedata
+from unicodedata import normalize
+from math import pi
 from pkg_resources import resource_filename, resource_exists
 
 # Display properties
@@ -42,8 +42,6 @@ MAXMSG = 32			# allow backlog of up to maxmsg unprocessed in
 
 # Image resource files
 GLSRC = resource_filename(__name__, 'data/ISO-8859-1.png')
-CKOPEN = resource_filename(__name__, 'data/clockpip-open.png')
-CKCLOSE = resource_filename(__name__, 'data/clockpip-close.png')
 CKOPEN = resource_filename(__name__, 'data/clockpip-open.png')
 CKCLOSE = resource_filename(__name__, 'data/clockpip-close.png')
 CKFACE = resource_filename(__name__, 'data/clockface-71.png')
@@ -122,7 +120,7 @@ class unt4(object):
                 self.xx = int(dlebuf[:2])
                 self.yy = int(dlebuf[2:])
             self.header = newhead
-            self.text = unicodedata.normalize('NFKC', newtext)
+            self.text = normalize('NFKC', newtext)
 
 # TCP/IP message receiver and socket server
 socketserver.TCPServer.allow_reuse_address = True
@@ -176,7 +174,7 @@ class tableau(threading.Thread):
         self.__ckc = cairo.Context(self.__cks)
         self.__ckc.set_operator(cairo.Operator.SOURCE)
         self.__ckc.set_line_width(0.75)
-        self.__ckrot = math.pi/30.0
+        self.__ckrot = pi/30.0
         self.__ckc.select_font_face(CKFONT)
         self.__ckc.set_font_size(CKFH)
         self.__ckf = cairo.ImageSurface.create_from_png(CKFACE)
