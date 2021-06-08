@@ -13,7 +13,7 @@ import socket
 import cairo
 import os
 import sys
-from unicodedata import normalize
+from unicodedata import normalize, combining
 from math import pi
 from pkg_resources import resource_filename, resource_exists
 
@@ -120,7 +120,7 @@ class unt4(object):
                 self.xx = int(dlebuf[:2])
                 self.yy = int(dlebuf[2:])
             self.header = newhead
-            self.text = normalize('NFKC', newtext)
+            self.text = normalize('NFC', newtext)
 
 # TCP/IP message receiver and socket server
 socketserver.TCPServer.allow_reuse_address = True
@@ -361,6 +361,12 @@ class tableau(threading.Thread):
             ctx.show_text(c)
             self.__fbglcache[c].flush()
 
+    def __overlay_char(self, c, x, y):
+        self.__txc.save()
+        self.__txc.set_operator(cairo.Operator.OVER)
+        self.__place_char(c, x, y)
+        self.__txc.restore()
+
     def __place_char(self, c, x, y):
         cord = ord(c)
         self.__txc.save()
@@ -411,8 +417,12 @@ class tableau(threading.Thread):
                 if msg.yy > 1:	# all non-headers are upper-cased
                     msg.text = msg.text.upper() # THIS MAY NOT BE THE SAME LEN
                 for c in msg.text:
-                    self.__place_char(c, ho, vo)
-                    ho += GLW
+                    if not combining(c):
+                        self.__place_char(c, ho, vo)
+                        ho += GLW
+                    else:
+                        # overwrite previous char, don't advace
+                        self.__overlay_char(c, ho-GLW, vo)
                     dirty = True
                 if msg.erl:
                     self.__txc.save()
