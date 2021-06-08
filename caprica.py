@@ -441,6 +441,10 @@ class tableau(threading.Thread):
                     pass
                 self.__d[msg.header] = nv
 
+            elif msg.header == 'OVERLAY 01':
+                # expire the timer to force re-display of fac clock
+                self.__lu = TIMEOUT + 1
+
             if dirty:
                 # Write frame to display socket
                 self.__txs.flush()
