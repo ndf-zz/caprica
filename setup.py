@@ -33,6 +33,9 @@ setuptools.setup(
                  'data/clockpip-close.png',
                  'data/clockpip-open.png',
                  'data/ISO-8859-1.png',
+                 'data/unichr-0x0030a.png',
+                 'data/unichr-0x0039b.png',
                  'data/unichr-0x00444.png',
+                 'data/unichr-0x02026.png',
                ]),],
 )
