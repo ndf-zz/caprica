@@ -2,7 +2,7 @@
 
 Crude Galactica/DHI replacement
 
-Copyright (C) 2019 Nathan Fraser
+![DISC Velodrome](disc_clock.jpg "DISC Velodrome")
 
 Caprica provides a minimal-function replacement for Galactica
 on older monochrome LED scoreboards from Omega (Swiss Timing)
